@@ -27,6 +27,7 @@ impl Opus {
 		//  - Reads sample rate
 		//  - Ignores pre-skip, gain, channel mapping for now
 
+		anyhow::ensure!(buf.remaining() >= 19, "OpusHead must be at least 19 bytes");
 		anyhow::ensure!(buf.chunk().starts_with(b"OpusHead"), "invalid OpusHead signature");
 
 		buf.advance(8); // Skip "OpusHead" signature
