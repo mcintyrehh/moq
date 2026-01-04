@@ -43,6 +43,7 @@ impl Hev1 {
 
 	fn init(&mut self, sps: &SpsNALUnit) -> anyhow::Result<()> {
 		let profile = &sps.rbsp.profile_tier_level.general_profile;
+		let vui_data = get_vui_data(&sps.rbsp.vui_parameters);
 
 		let config = hang::catalog::VideoConfig {
 			coded_width: Some(sps.rbsp.cropped_width() as u32),
@@ -58,11 +59,10 @@ impl Hev1 {
 			}
 			.into(),
 			description: None,
-			// TODO: populate these fields from sps.rbsp.vui_parameters
-			framerate: None,
+			framerate: vui_data.framerate,
 			bitrate: None,
-			display_ratio_width: None,
-			display_ratio_height: None,
+			display_ratio_width: vui_data.display_ratio_width,
+			display_ratio_height: vui_data.display_ratio_height,
 			optimize_for_latency: None,
 		};
 
@@ -464,4 +464,66 @@ struct Frame {
 	chunks: BufList,
 	contains_idr: bool,
 	contains_slice: bool,
+}
+
+struct VuiData {
+	framerate: Option<f64>,
+	display_ratio_width: Option<u32>,
+	display_ratio_height: Option<u32>,
+}
+
+fn get_vui_data(vui: &Option<scuffle_h265::VuiParameters>) -> VuiData {
+	// FPS = time_scale / num_units_in_tick
+	let framerate = vui
+		.as_ref()
+		.and_then(|v| v.vui_timing_info.as_ref())
+		.map(|t| t.time_scale.get() as f64 / t.num_units_in_tick.get() as f64);
+
+	let (display_ratio_width, display_ratio_height) = vui
+		.as_ref()
+		.map(|v| &v.aspect_ratio_info)
+		.and_then(|ar| {
+			tracing::trace!(?ar, "~~~aspect ratio info");
+			match ar {
+				// Extended SAR has explicit arbitrary values for width and height.
+				scuffle_h265::AspectRatioInfo::ExtendedSar { sar_width, sar_height } => {
+					Some((Some(*sar_width as u32), Some(*sar_height as u32)))
+				}
+				//
+				scuffle_h265::AspectRatioInfo::Predefined(idc) => {
+					aspect_ratio_from_idc(*idc).map(|(w, h)| (Some(w), Some(h)))
+				}
+			}
+		})
+		.unwrap_or((None, None));
+
+	VuiData {
+		framerate,
+		display_ratio_width,
+		display_ratio_height,
+	}
+}
+
+fn aspect_ratio_from_idc(idc: scuffle_h265::AspectRatioIdc) -> Option<(u32, u32)> {
+	match idc {
+		scuffle_h265::AspectRatioIdc::Unspecified => None,
+		scuffle_h265::AspectRatioIdc::Square => Some((1, 1)),
+		scuffle_h265::AspectRatioIdc::Aspect12_11 => Some((12, 11)),
+		scuffle_h265::AspectRatioIdc::Aspect10_11 => Some((10, 11)),
+		scuffle_h265::AspectRatioIdc::Aspect16_11 => Some((16, 11)),
+		scuffle_h265::AspectRatioIdc::Aspect40_33 => Some((40, 33)),
+		scuffle_h265::AspectRatioIdc::Aspect24_11 => Some((24, 11)),
+		scuffle_h265::AspectRatioIdc::Aspect20_11 => Some((20, 11)),
+		scuffle_h265::AspectRatioIdc::Aspect32_11 => Some((32, 11)),
+		scuffle_h265::AspectRatioIdc::Aspect80_33 => Some((80, 33)),
+		scuffle_h265::AspectRatioIdc::Aspect18_11 => Some((18, 11)),
+		scuffle_h265::AspectRatioIdc::Aspect15_11 => Some((15, 11)),
+		scuffle_h265::AspectRatioIdc::Aspect64_33 => Some((64, 33)),
+		scuffle_h265::AspectRatioIdc::Aspect160_99 => Some((160, 99)),
+		scuffle_h265::AspectRatioIdc::Aspect4_3 => Some((4, 3)),
+		scuffle_h265::AspectRatioIdc::Aspect3_2 => Some((3, 2)),
+		scuffle_h265::AspectRatioIdc::Aspect2_1 => Some((2, 1)),
+		scuffle_h265::AspectRatioIdc::ExtendedSar => None,
+		_ => None, // Reserved
+	}
 }
