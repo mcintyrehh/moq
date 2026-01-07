@@ -8,7 +8,6 @@ mod hls;
 mod opus;
 
 pub use aac::*;
-pub use annexb::*;
 pub use avc3::*;
 pub use decoder::*;
 pub use fmp4::*;

@@ -31,10 +31,6 @@ impl FromStr for DecoderFormat {
 				Ok(DecoderFormat::Avc3)
 			}
 			"hev1" => Ok(DecoderFormat::Hev1),
-			"h265" | "hevc" => {
-				tracing::warn!("format '{s}' is deprecated, use 'hev1' instead");
-				Ok(DecoderFormat::Hev1)
-			}
 			"fmp4" | "cmaf" => Ok(DecoderFormat::Fmp4),
 			"aac" => Ok(DecoderFormat::Aac),
 			"opus" => Ok(DecoderFormat::Opus),
