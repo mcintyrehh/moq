@@ -1,5 +1,5 @@
 import { Mutex } from "async-mutex";
-import type { Reader, Stream as StreamInner, Writer } from "../stream.ts";
+import type { Stream as StreamInner, Writer } from "../stream.ts";
 import { Fetch, FetchCancel, FetchError, FetchOk } from "./fetch.ts";
 import { GoAway } from "./goaway.ts";
 import { Publish, PublishDone, PublishError, PublishOk } from "./publish.ts";
@@ -80,9 +80,13 @@ const MessagesV15 = {
 	[RequestsBlocked.id]: RequestsBlocked,
 } as const;
 
+// v16 uses the same message map as v15
+const MessagesV16 = MessagesV15;
+
 type V14MessageType = (typeof MessagesV14)[keyof typeof MessagesV14];
 type V15MessageType = (typeof MessagesV15)[keyof typeof MessagesV15];
-type MessageType = V14MessageType | V15MessageType;
+type V16MessageType = (typeof MessagesV16)[keyof typeof MessagesV16];
+type MessageType = V14MessageType | V15MessageType | V16MessageType;
 
 // Type for control message instances (not constructors)
 export type Message = InstanceType<MessageType>;
@@ -123,8 +127,7 @@ export class Stream {
 			await this.stream.writer.u53((message.constructor as MessageType).id);
 
 			// Write message payload with u16 size prefix
-			// Extra version arg is silently ignored by messages that don't need it
-			await (message.encode as (w: Writer, v?: IetfVersion) => Promise<void>)(this.stream.writer, this.version);
+			await (message.encode as (w: Writer, v: IetfVersion) => Promise<void>)(this.stream.writer, this.version);
 		});
 	}
 
@@ -136,21 +139,19 @@ export class Stream {
 		return await this.#readLock.runExclusive(async () => {
 			const messageType = await this.stream.reader.u53();
 
-			const messages = this.version === Version.DRAFT_15 ? MessagesV15 : MessagesV14;
+			const messages =
+				this.version === Version.DRAFT_16
+					? MessagesV16
+					: this.version === Version.DRAFT_15
+						? MessagesV15
+						: MessagesV14;
 			if (!(messageType in messages)) {
 				throw new Error(`Unknown control message type: ${messageType}`);
 			}
 
 			try {
 				const msgClass = messages[messageType as keyof typeof messages];
-
-				// Extra version arg is silently ignored by messages that don't need it
-				const msg = await (msgClass as { decode: (r: Reader, v?: IetfVersion) => Promise<Message> }).decode(
-					this.stream.reader,
-					this.version,
-				);
-
-				console.debug("message read", msg);
+				const msg = await msgClass.decode(this.stream.reader, this.version);
 				return msg;
 			} catch (err) {
 				console.error("failed to decode message", messageType, err);

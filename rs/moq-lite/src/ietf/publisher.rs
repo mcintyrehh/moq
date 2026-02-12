@@ -134,7 +134,7 @@ impl<S: web_transport_trait::Session> Publisher<S> {
 		Ok(())
 	}
 
-	/// Send a subscribe error, using RequestError for v15.
+	/// Send a subscribe error, using RequestError for v15+.
 	fn send_subscribe_error(&self, request_id: RequestId, error_code: u64, reason: &str) -> Result<(), Error> {
 		match self.version {
 			Version::Draft14 => self.control.send(ietf::SubscribeError {
@@ -142,10 +142,11 @@ impl<S: web_transport_trait::Session> Publisher<S> {
 				error_code,
 				reason_phrase: reason.into(),
 			}),
-			Version::Draft15 => self.control.send(ietf::RequestError {
+			Version::Draft15 | Version::Draft16 => self.control.send(ietf::RequestError {
 				request_id,
 				error_code,
 				reason_phrase: reason.into(),
+				retry_interval: 0,
 			}),
 		}
 	}
@@ -302,7 +303,9 @@ impl<S: web_transport_trait::Session> Publisher<S> {
 					};
 
 					match chunk? {
-						Some(mut chunk) => stream.write_all(&mut chunk).await?,
+						Some(mut chunk) => {
+							stream.write_all(&mut chunk).await?;
+						}
 						None => break,
 					}
 				}
@@ -407,7 +410,7 @@ impl<S: web_transport_trait::Session> Publisher<S> {
 		Ok(())
 	}
 
-	/// Send a fetch OK, using RequestOk for v15.
+	/// Send a fetch OK, using RequestOk for v15+.
 	fn send_fetch_ok(&self, request_id: RequestId) -> Result<(), Error> {
 		match self.version {
 			Version::Draft14 => self.control.send(ietf::FetchOk {
@@ -416,14 +419,14 @@ impl<S: web_transport_trait::Session> Publisher<S> {
 				end_of_track: false,
 				end_location: Location { group: 0, object: 0 },
 			}),
-			Version::Draft15 => self.control.send(ietf::RequestOk {
+			Version::Draft15 | Version::Draft16 => self.control.send(ietf::RequestOk {
 				request_id,
 				parameters: MessageParameters::default(),
 			}),
 		}
 	}
 
-	/// Send a fetch error, using RequestError for v15.
+	/// Send a fetch error, using RequestError for v15+.
 	fn send_fetch_error(&self, request_id: RequestId, error_code: u64, reason: &str) -> Result<(), Error> {
 		match self.version {
 			Version::Draft14 => self.control.send(ietf::FetchError {
@@ -431,10 +434,11 @@ impl<S: web_transport_trait::Session> Publisher<S> {
 				error_code,
 				reason_phrase: reason.into(),
 			}),
-			Version::Draft15 => self.control.send(ietf::RequestError {
+			Version::Draft15 | Version::Draft16 => self.control.send(ietf::RequestError {
 				request_id,
 				error_code,
 				reason_phrase: reason.into(),
+				retry_interval: 0,
 			}),
 		}
 	}

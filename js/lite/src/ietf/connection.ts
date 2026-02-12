@@ -64,7 +64,7 @@ export class Connection implements Established {
 	 *
 	 * @internal
 	 */
-	constructor(url: URL, quic: WebTransport, control: Stream, maxRequestId: bigint, version?: IetfVersion) {
+	constructor(url: URL, quic: WebTransport, control: Stream, maxRequestId: bigint, version: IetfVersion) {
 		this.url = url;
 		this.#quic = quic;
 		this.#control = new Control.Stream(control, maxRequestId, version);
@@ -284,7 +284,6 @@ export class Connection implements Established {
 		try {
 			// we don't support other stream types yet
 			const header = await Group.decode(stream);
-			console.debug("received group header", header);
 			await this.#subscriber.handleGroup(header, stream);
 		} catch (err) {
 			console.error("error processing object stream", err);
