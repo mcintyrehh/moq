@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0](https://github.com/moq-dev/moq/compare/hang-v0.13.1...hang-v0.14.0) - 2026-02-12
+
+### Other
+
+- Error cleanup ([#944](https://github.com/moq-dev/moq/pull/944))
+- Reduce the moq-lite API size ([#943](https://github.com/moq-dev/moq/pull/943))
+
+## [0.13.1](https://github.com/moq-dev/moq/compare/hang-v0.13.0...hang-v0.13.1) - 2026-02-09
+
+### Other
+
+- Fix video track naming to handle empty extensions ([#934](https://github.com/moq-dev/moq/pull/934))
+- native client integration guide ([#931](https://github.com/moq-dev/moq/pull/931))
+- Run unit tests in CI ([#921](https://github.com/moq-dev/moq/pull/921))
+
 ## [0.12.0](https://github.com/moq-dev/moq/compare/hang-v0.11.0...hang-v0.12.0) - 2026-02-03
 
 ### Other

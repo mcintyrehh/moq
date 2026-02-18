@@ -12,8 +12,10 @@
 		"js/clock",
 		"js/token",
 		"js/hang",
-		"js/hang-ui",
-		"js/hang-demo",
+		"js/ui-core",
+		"js/watch",
+		"js/publish",
+		"js/demo",
 		"js/signals"
 	],
 	"scripts": {
@@ -22,6 +24,8 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.3.11",
-		"concurrently": "^9.2.1"
+		"@types/bun": "^1.3.8",
+		"concurrently": "^9.2.1",
+		"publint": "^0.3.0"
 	}
 }

@@ -13,6 +13,12 @@ mod cluster;
 mod config;
 mod connection;
 mod web;
+#[cfg(feature = "websocket")]
+mod websocket;
+
+/// The relay needs higher stream limits than the library default
+/// to handle many concurrent subscriptions across connections.
+const DEFAULT_MAX_STREAMS: u64 = 10_000;
 
 pub use auth::*;
 pub use cluster::*;
@@ -28,10 +34,15 @@ async fn main() -> anyhow::Result<()> {
 		.install_default()
 		.expect("failed to install default crypto provider");
 
-	let config = Config::load()?;
+	let mut config = Config::load()?;
 
 	let addr = config.server.bind.unwrap_or("[::]:443".parse().unwrap());
-	let server = config.server.init()?;
+
+	config.client.max_streams.get_or_insert(DEFAULT_MAX_STREAMS);
+	config.server.max_streams.get_or_insert(DEFAULT_MAX_STREAMS);
+
+	#[allow(unused_mut)]
+	let mut server = config.server.init()?;
 	let client = config.client.init()?;
 
 	#[cfg(feature = "iroh")]

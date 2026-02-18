@@ -5,7 +5,7 @@ description: Publish camera, microphone, or screen to MoQ
 
 # Publishing Streams
 
-This guide covers how to publish media to MoQ relays using `@moq/hang`.
+This guide covers how to publish media to MoQ relays using `@moq/publish`.
 
 ## Web Component
 
@@ -13,16 +13,16 @@ The simplest way to publish:
 
 ```html
 <script type="module">
-    import "@moq/hang/publish/element";
+    import "@moq/publish/element";
 </script>
 
-<hang-publish
+<moq-publish
     url="https://relay.example.com/anon"
     path="room/alice"
     device="camera"
     audio video controls>
     <video muted autoplay></video>
-</hang-publish>
+</moq-publish>
 ```
 
 ### Attributes
@@ -39,7 +39,7 @@ The simplest way to publish:
 ### Events
 
 ```typescript
-const publish = document.querySelector("hang-publish") as HangPublish;
+const publish = document.querySelector("moq-publish") as MoqPublish;
 
 publish.addEventListener("start", () => {
     console.log("Publishing started");
@@ -252,11 +252,11 @@ try {
 
 ```tsx
 import { useEffect, useRef, useState } from "react";
-import "@moq/hang/publish/element";
-import type { HangPublish } from "@moq/hang";
+import "@moq/publish/element";
+import type MoqPublish from "@moq/publish/element";
 
 function Publisher({ url, path }) {
-    const publishRef = useRef<HangPublish>(null);
+    const publishRef = useRef<MoqPublish>(null);
     const [isPublishing, setIsPublishing] = useState(false);
 
     const togglePublish = () => {
@@ -269,13 +269,13 @@ function Publisher({ url, path }) {
 
     return (
         <div>
-            <hang-publish
+            <moq-publish
                 ref={publishRef}
                 url={url}
                 path={path}
                 audio video>
                 <video muted autoplay style={{ width: "100%" }} />
-            </hang-publish>
+            </moq-publish>
 
             <button onClick={togglePublish}>
                 {isPublishing ? "Stop" : "Start"} Publishing
@@ -287,20 +287,19 @@ function Publisher({ url, path }) {
 
 ## SolidJS Integration
 
-Use `@moq/hang-ui`:
+Use `@moq/publish/ui` for the SolidJS UI overlay. The `<moq-publish-ui>` element wraps a nested `<moq-publish>`:
 
-```tsx
-import { HangPublish } from "@moq/hang-ui/publish";
+```html
+<script type="module">
+    import "@moq/publish/element";
+    import "@moq/publish/ui";
+</script>
 
-function Publisher(props) {
-    return (
-        <HangPublish
-            url={props.url}
-            path={props.path}
-            audio video controls
-        />
-    );
-}
+<moq-publish-ui>
+    <moq-publish url="https://relay.example.com/anon" path="room/alice" audio video>
+        <video muted autoplay></video>
+    </moq-publish>
+</moq-publish-ui>
 ```
 
 ## Authentication
@@ -308,11 +307,11 @@ function Publisher(props) {
 Include JWT token in the URL:
 
 ```html
-<hang-publish
+<moq-publish
     url="https://relay.example.com/room/123?jwt=eyJhbGciOiJIUzI1NiIs..."
     path="alice"
     audio video>
-</hang-publish>
+</moq-publish>
 ```
 
 See [Authentication](/app/relay/auth) for token generation.

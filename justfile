@@ -11,7 +11,7 @@ default:
 # Install any dependencies.
 install:
 	bun install
-	cargo install --locked cargo-shear cargo-sort cargo-upgrades cargo-edit cargo-hack
+	cargo install --locked cargo-shear cargo-sort cargo-upgrades cargo-edit cargo-hack cargo-sweep
 
 # Alias for dev.
 all: dev
@@ -51,22 +51,28 @@ cluster:
 	# Then run a BOATLOAD of services to make sure they all work correctly.
 	# Publish the funny bunny to the root node.
 	# Publish the robot fanfic to the leaf node.
-	bun run concurrently --kill-others --names root,leaf,bbb,tos,web --prefix-colors auto \
+	bun run concurrently --kill-others --names root,leaf0,leaf1,bbb,tos,web --prefix-colors auto \
 		"just root" \
-		"sleep 1 && just leaf" \
-		"sleep 2 && just pub bbb http://localhost:4444/demo?jwt=$(cat dev/demo-cli.jwt)" \
-		"sleep 3 && just pub tos http://localhost:4443/demo?jwt=$(cat dev/demo-cli.jwt)" \
-		"sleep 4 && just web http://localhost:4443/demo?jwt=$(cat dev/demo-web.jwt)"
+		"sleep 1 && just leaf0" \
+		"sleep 2 && just leaf1" \
+		"sleep 3 && just pub bbb http://localhost:4444/demo?jwt=$(cat dev/demo-cli.jwt)" \
+		"sleep 4 && just pub tos http://localhost:4443/demo?jwt=$(cat dev/demo-cli.jwt)" \
+		"sleep 5 && just web http://localhost:4445/demo?jwt=$(cat dev/demo-web.jwt)"
 
 # Run a localhost root server, accepting connections from leaf nodes.
 root: auth-key
 	# Run the root server with a special configuration file.
 	cargo run --bin moq-relay -- dev/root.toml
 
-# Run a localhost leaf server, connecting to the root server.
-leaf: auth-token
+# Run a localhost leaf, connecting to the root server.
+leaf0: auth-token
 	# Run the leaf server with a special configuration file.
-	cargo run --bin moq-relay -- dev/leaf.toml
+	cargo run --bin moq-relay -- dev/leaf0.toml
+
+# Run a second localhost leaf, connecting to the root server.
+leaf1: auth-token
+	# Run the leaf server with a special configuration file.
+	cargo run --bin moq-relay -- dev/leaf1.toml
 
 # Generate a random secret key for authentication.
 # By default, this uses HMAC-SHA256, so it's symmetric.
@@ -140,7 +146,7 @@ ffmpeg-cmaf input output='-' *args:
 # Publish a video using ffmpeg to the localhost relay server
 # NOTE: The `http` means that we perform insecure certificate verification.
 # Switch it to `https` when you're ready to use a real certificate.
-pub name url="http://localhost:4443/anon" prefix="" *args:
+pub name url="http://localhost:4443/anon" *args:
 	# Download the sample media.
 	just download "{{name}}"
 	# Pre-build the binary so we don't queue media while compiling.
@@ -148,7 +154,17 @@ pub name url="http://localhost:4443/anon" prefix="" *args:
 	# Publish the media with the moq cli.
 	just ffmpeg-cmaf "dev/{{name}}.fmp4" |\
 	cargo run --bin moq -- \
-		publish --url "{{url}}" --name "{{prefix}}{{name}}" {{args}} fmp4
+		{{args}} publish --url "{{url}}" --name "{{name}}" fmp4
+
+pub-iroh name url prefix="":
+	# Download the sample media.
+	just download "{{name}}"
+	# Pre-build the binary so we don't queue media while compiling.
+	cargo build --bin moq
+	# Publish the media with the moq cli.
+	just ffmpeg-cmaf "dev/{{name}}.fmp4" |\
+	cargo run --bin moq -- \
+		--iroh-enabled publish --url "{{url}}" --name "{{prefix}}{{name}}" fmp4
 
 # Generate and ingest an HLS stream from a video file.
 pub-hls name relay="http://localhost:4443/anon":
@@ -287,7 +303,7 @@ serve name *args:
 
 # Run the web server
 web url='http://localhost:4443/anon':
-	cd js/hang-demo && VITE_RELAY_URL="{{url}}" bun run dev
+	cd js/demo && VITE_RELAY_URL="{{url}}" bun run dev
 
 # Publish the clock broadcast
 # `action` is either `publish` or `subscribe`
@@ -334,17 +350,23 @@ check:
 	if command -v nix &> /dev/null; then nix flake check; fi
 
 # Run comprehensive CI checks including all feature combinations (requires cargo-hack)
-check-all:
+ci:
 	#!/usr/bin/env bash
 	set -euo pipefail
 
 	# Run the standard checks first
 	just check
 
-	# Check all feature combinations for the hang crate
+	# Run the unit tests
+	just test
+
+	# Make sure everything builds
+	just build
+
+	# Check all feature combinations for all crates
 	# requires: cargo install cargo-hack
-	echo "Checking all feature combinations for hang..."
-	cargo hack check --package hang --each-feature --no-dev-deps
+	echo "Checking all feature combinations..."
+	cargo hack check --workspace --each-feature --no-dev-deps
 
 # Run the unit tests
 test:
@@ -360,19 +382,6 @@ test:
 	fi
 
 	cargo test --all-targets --all-features
-
-# Run comprehensive tests including all feature combinations (requires cargo-hack)
-test-all:
-	#!/usr/bin/env bash
-	set -euo pipefail
-
-	# Run the standard tests first
-	just test
-
-	# Test all feature combinations for the hang crate
-	# requires: cargo install cargo-hack
-	echo "Testing all feature combinations for hang..."
-	cargo hack test --package hang --each-feature
 
 # Automatically fix some issues.
 fix:
@@ -392,6 +401,9 @@ fix:
 
 	if command -v tofu &> /dev/null; then (cd cdn && just fix); fi
 
+	# Remove old build artifacts to save disk space.
+	if command -v cargo-sweep &> /dev/null; then cargo sweep --time 7; fi
+
 # Upgrade any tooling
 update:
 	bun update
@@ -405,6 +417,7 @@ update:
 
 	# Update the Nix flake.
 	nix flake update
+
 
 # Build the packages
 build:

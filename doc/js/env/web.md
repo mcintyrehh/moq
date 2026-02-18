@@ -16,7 +16,7 @@ description: Web Components API reference
 
 ## Available Components
 
-### `<hang-publish>`
+### `<moq-publish>`
 
 Publish camera/microphone or screen as a MoQ broadcast.
 
@@ -32,20 +32,20 @@ Publish camera/microphone or screen as a MoQ broadcast.
 
 ```html
 <script type="module">
-    import "@moq/hang/publish/element";
+    import "@moq/publish/element";
 </script>
 
-<hang-publish
+<moq-publish
     url="https://relay.example.com/anon"
     path="room/alice"
     device="camera"
     audio video controls>
     <!-- Optional preview element -->
     <video muted autoplay style="width: 100%"></video>
-</hang-publish>
+</moq-publish>
 ```
 
-### `<hang-watch>`
+### `<moq-watch>`
 
 Subscribe to and render a MoQ broadcast.
 
@@ -61,36 +61,55 @@ Subscribe to and render a MoQ broadcast.
 
 ```html
 <script type="module">
-    import "@moq/hang/watch/element";
+    import "@moq/watch/element";
 </script>
 
-<hang-watch
+<moq-watch
     url="https://relay.example.com/anon"
     path="room/alice"
     volume="0.8"
     controls>
     <!-- Optional canvas for video rendering -->
     <canvas style="width: 100%"></canvas>
-</hang-watch>
+</moq-watch>
 ```
 
-### `<hang-support>`
+### `<moq-watch-support>`
 
-Display browser support information.
+Display browser support information for watching streams.
 
 **Attributes:**
-- `mode` - "publish" or "watch"
-- `show` - "always", "partial", or "never" (default: "partial")
+- `show` - "always", "warning", "error", or "never" (default: "warning")
+- `details` - show detailed codec information
 
 **Example:**
 
 ```html
 <script type="module">
-    import "@moq/hang/support/element";
+    import "@moq/watch/support/element";
 </script>
 
-<!-- Show only when publishing is not supported -->
-<hang-support mode="publish" show="partial"></hang-support>
+<!-- Show only when a polyfill/fallback is needed -->
+<moq-watch-support show="warning"></moq-watch-support>
+```
+
+### `<moq-publish-support>`
+
+Display browser support information for publishing streams.
+
+**Attributes:**
+- `show` - "always", "warning", "error", or "never" (default: "warning")
+- `details` - show detailed codec information
+
+**Example:**
+
+```html
+<script type="module">
+    import "@moq/publish/support/element";
+</script>
+
+<!-- Show only when a polyfill/fallback is needed -->
+<moq-publish-support show="warning"></moq-publish-support>
 ```
 
 ## Using JavaScript Properties
@@ -99,7 +118,7 @@ HTML attributes are strings, but JavaScript properties are typed and reactive:
 
 ```typescript
 // Get element reference
-const watch = document.querySelector("hang-watch") as HangWatch;
+const watch = document.querySelector("moq-watch") as MoqWatch;
 
 // Set properties (reactive)
 watch.volume.set(0.8);
@@ -120,9 +139,9 @@ const currentVolume = watch.volume.get();
 All properties are signals from `@moq/signals`:
 
 ```typescript
-import { HangWatch } from "@moq/hang/watch/element";
+import MoqWatch from "@moq/watch/element";
 
-const watch = document.querySelector("hang-watch") as HangWatch;
+const watch = document.querySelector("moq-watch") as MoqWatch;
 
 // These are all reactive signals:
 watch.volume    // Signal<number>
@@ -138,10 +157,10 @@ watch.path      // Signal<string>
 
 ```tsx
 import { useEffect, useRef } from "react";
-import "@moq/hang/watch/element";
+import "@moq/watch/element";
 
 function VideoPlayer({ url, path }) {
-    const ref = useRef<HangWatch>(null);
+    const ref = useRef<MoqWatch>(null);
 
     useEffect(() => {
         if (ref.current) {
@@ -150,32 +169,32 @@ function VideoPlayer({ url, path }) {
     }, []);
 
     return (
-        <hang-watch
+        <moq-watch
             ref={ref}
             url={url}
             path={path}
             controls>
             <canvas />
-        </hang-watch>
+        </moq-watch>
     );
 }
 ```
 
 ### SolidJS
 
-Use `@moq/hang-ui` for native SolidJS components, or use Web Components directly:
+Use `@moq/watch/ui` and `@moq/publish/ui` for SolidJS UI overlays, or use Web Components directly:
 
 ```tsx
-import "@moq/hang/watch/element";
+import "@moq/watch/element";
 
 function VideoPlayer(props) {
     return (
-        <hang-watch
+        <moq-watch
             url={props.url}
             path={props.path}
             controls>
             <canvas />
-        </hang-watch>
+        </moq-watch>
     );
 }
 ```
@@ -184,16 +203,16 @@ function VideoPlayer(props) {
 
 ```vue
 <template>
-    <hang-watch
+    <moq-watch
         :url="url"
         :path="path"
         controls>
         <canvas />
-    </hang-watch>
+    </moq-watch>
 </template>
 
 <script>
-import "@moq/hang/watch/element";
+import "@moq/watch/element";
 
 export default {
     props: ["url", "path"],
@@ -207,19 +226,19 @@ Web Components use Shadow DOM, so global styles won't apply. Use CSS custom prop
 
 ```html
 <style>
-hang-watch::part(video) {
+moq-watch::part(video) {
     border-radius: 8px;
 }
 
-hang-watch canvas {
+moq-watch canvas {
     width: 100%;
     border-radius: 8px;
 }
 </style>
 
-<hang-watch url="..." path="..." controls>
+<moq-watch url="..." path="..." controls>
     <canvas style="width: 100%; border-radius: 8px;"></canvas>
-</hang-watch>
+</moq-watch>
 ```
 
 ## Tree-Shaking
@@ -228,10 +247,10 @@ To prevent tree-shaking from removing component registrations, explicitly import
 
 ```typescript
 // Correct
-import "@moq/hang/watch/element";
+import "@moq/watch/element";
 
 // May be tree-shaken (don't use)
-import "@moq/hang";
+import "@moq/watch";
 ```
 
 ## TypeScript Support
@@ -239,10 +258,11 @@ import "@moq/hang";
 Full TypeScript support with type definitions:
 
 ```typescript
-import type { HangWatch, HangPublish } from "@moq/hang";
+import MoqWatch from "@moq/watch/element";
+import MoqPublish from "@moq/publish/element";
 
-const watch: HangWatch = document.querySelector("hang-watch")!;
-const publish: HangPublish = document.querySelector("hang-publish")!;
+const watch: MoqWatch = document.querySelector("moq-watch")!;
+const publish: MoqPublish = document.querySelector("moq-publish")!;
 ```
 
 ## Events
@@ -250,7 +270,7 @@ const publish: HangPublish = document.querySelector("hang-publish")!;
 Components emit custom events:
 
 ```typescript
-const watch = document.querySelector("hang-watch") as HangWatch;
+const watch = document.querySelector("moq-watch") as MoqWatch;
 
 watch.addEventListener("play", () => {
     console.log("Playback started");
@@ -290,7 +310,7 @@ For production, you'll want to:
 2. Set up proper [authentication](/app/relay/auth)
 3. Use a bundler like [Vite](https://vite.dev/)
 
-Currently, you need to use a bundler and [Vite](https://vite.dev/) is the only supported option for `@moq/hang`.
+Currently, you need to use a bundler and [Vite](https://vite.dev/) is the only supported option for `@moq/watch` and `@moq/publish`.
 It makes me very sad and we're working on a more universal solution, contributions welcome!
 
 **NOTE** both of these libraries are intended for client-side.

@@ -1,11 +1,9 @@
 ---
 title: Layering
-description: It's like a cake but reusable.
+description: It's like a cake; you choose if you want frosting.
 ---
 
 # Layers
-It's like a cake but reusable.
-
 The design philosophy of MoQ is to make things simple, composable, and customizable.
 We don't want you to hit a brick wall if you deviate from the standard path (*ahem* WebRTC).
 We also want to benefit from economies of scale (like HTTP), utilizing generic libraries and tools whenever possible.
@@ -26,14 +24,13 @@ To accomplish this, MoQ is broken into layers:
 │  WebTransport   │  🌐 Browser-compatible QUIC
 │                 │     - HTTP/3 handshake
 ├─────────────────┤
-|      QUIC       |  🌐 Underlying transport protocol
+│      QUIC       │  🌐 Underlying transport protocol
 │                 │     - streams, datagrams, prioritization, etc.
 └─────────────────┘
 ```
 
-You need to have some understanding of the responsibility and purpose of each layer to best utilize MoQ.
-Let's dive in, starting at the bottom of the stack.
-
+You can choose which layers to use and which to replace.
+It's like a cake; you choose if you want frosting.
 
 ## QUIC
 QUIC is the core protocol that powers HTTP/3, designed to fix head-of-line blocking that plagues TCP and thus HTTP/2.

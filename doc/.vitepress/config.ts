@@ -39,19 +39,21 @@ export default defineConfig({
 					items: [
 						{
 							text: "Layers",
+							link: "/concept/layer/",
 							items: [
-								{ text: "Overview", link: "/concept/layer/" },
-								{ text: "lite", link: "/concept/layer/moq-lite" },
+								{ text: "quic", link: "/concept/layer/quic" },
+								{ text: "web-transport", link: "/concept/layer/web-transport" },
+								{ text: "moq-lite", link: "/concept/layer/moq-lite" },
 								{ text: "hang", link: "/concept/layer/hang" },
 							],
 						},
-
-						{ text: "Terminology", link: "/concept/terminology" },
 						{
 							text: "Standards",
+							link: "/concept/standard/",
 							items: [
-								{ text: "Overview", link: "/concept/standard/" },
 								{ text: "MoqTransport", link: "/concept/standard/moq-transport" },
+								{ text: "MSF", link: "/concept/standard/msf" },
+								{ text: "LOC", link: "/concept/standard/loc" },
 							],
 						},
 						{
@@ -61,6 +63,8 @@ export default defineConfig({
 								{ text: "Contribution", link: "/concept/use-case/contribution" },
 								{ text: "Distribution", link: "/concept/use-case/distribution" },
 								{ text: "Conferencing", link: "/concept/use-case/conferencing" },
+								{ text: "AI", link: "/concept/use-case/ai" },
+								{ text: "Other", link: "/concept/use-case/other" },
 							],
 						},
 					],
@@ -79,6 +83,7 @@ export default defineConfig({
 								{ text: "Configuration", link: "/app/relay/config" },
 								{ text: "Authentication", link: "/app/relay/auth" },
 								{ text: "Clustering", link: "/app/relay/cluster" },
+								{ text: "HTTP", link: "/app/relay/http" },
 								{ text: "Production", link: "/app/relay/production" },
 							],
 						},
@@ -133,7 +138,9 @@ export default defineConfig({
 								{ text: "Publish", link: "/js/@moq/hang/publish" },
 							],
 						},
-						{ text: "@moq/hang-ui", link: "/js/@moq/hang-ui" },
+						{ text: "@moq/watch", link: "/js/@moq/watch" },
+						{ text: "@moq/publish", link: "/js/@moq/publish" },
+						{ text: "@moq/ui-core", link: "/js/@moq/ui-core" },
 						{ text: "@moq/token", link: "/js/@moq/token" },
 						{ text: "@moq/signals", link: "/js/@moq/signals" },
 						{ text: "@moq/web-transport-ws", link: "/js/@moq/web-transport-ws" },

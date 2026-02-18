@@ -4,219 +4,106 @@ description: How MoQ compares to contribution protocols like RTMP and SRT
 ---
 
 # MoQ vs RTMP/SRT
+This page compares MoQ with traditional **contribution protocols** like RTMP and SRT.
 
-This page compares MoQ with traditional **contribution protocols** like RTMP and SRT, which are typically used to send live video from encoders to media servers.
+## Requirements
+Okay the boring stuff first.
+Contribution protocols need to:
 
-## What are Contribution Protocols?
+- Publish from a client to a server
+- Interface with encoders and other media sources (like OBS)
+- Support a wide range of devices (browsers optional)
+- Support a wide range of networks (especially mobile)
+- Support the latest and greatest codecs
+- Support live streaming (duh)
+- (optional) support ad signaling 🤮
 
-Contribution protocols handle the **first mile** of live streaming - getting content from the source (camera, encoder, OBS) to the media server. They prioritize:
+## Existing Protocols
+- **RTMP** ([Real-Time Messaging Protocol](https://en.wikipedia.org/wiki/Real-Time_Messaging_Protocol)) - The classic Flash-era protocol
+- **SRT** ([Secure Reliable Transport](https://en.wikipedia.org/wiki/Secure_Reliable_Transport)) - Modern "low-latency" alternative
+- **E-RTMP** ([Enhanced RTMP](https://en.wikipedia.org/wiki/Real-Time_Messaging_Protocol#Enhanced_RTMP)) - Modernized version of RTMP
+- **WebRTC** ([Web Real-Time Communication](https://en.wikipedia.org/wiki/WebRTC)) - Can be used for contribution via [WHIP](https://www.rfc-editor.org/rfc/rfc9725.html)
+- **RTSP** ([Real-Time Streaming Protocol](https://en.wikipedia.org/wiki/Real-Time_Streaming_Protocol)) - Used in IP cameras
 
-- Low latency encoding-to-server
-- Reliable delivery over unreliable networks
-- Simple encoder integration
-- Single stream per connection
+The contribution landscape is quite fragmented, mostly split into two camps:
+1. User generated content (YouTube/Twitch/Facebook) primarily uses RTMP.
+2. Studio generated content primarily uses SRT.
 
-Common examples:
-- **RTMP** (Real-Time Messaging Protocol) - The classic Flash-era protocol
-- **SRT** (Secure Reliable Transport) - Modern low-latency alternative
-- **RTSP** (Real-Time Streaming Protocol) - Used in IP cameras
+That's an over-generalization of course, but it's very interesting to see the divide.
+SRT is built into modern production equipment (hardware) while RTMP is used in consumer software.
 
-## Comparison Table
+Why? IDK.
 
-| Feature | RTMP | SRT | MoQ |
-|---------|------|-----|-----|
-| **Transport** | TCP | UDP | QUIC (UDP) |
-| **Latency** | 1-5s | 120ms-2s | <100ms possible |
-| **Browser Support** | None (Flash dead) | None | Native WebTransport |
-| **Encryption** | RTMPS (TLS) | AES-128/256 | TLS 1.3 built-in |
-| **Congestion Control** | None (TCP) | Custom | QUIC (BBR, etc.) |
-| **FEC** | No | Yes | QUIC retransmits |
-| **Multiplexing** | Limited | No | Native (QUIC streams) |
-| **Fan-out** | Server-side only | Server-side only | Native relay support |
+## Pull vs Push
+Existing contribution protocols are push-based.
+Even Youtube's weird HLS ingest thing operates via POST requests.
 
-## Protocol Details
+However, MoQ is fundamentally a pull-based protocol.
+Technically, MoqTransport supports push too (via PUBLISH), but hear me out for a second.
 
-### RTMP
+### The Push Problem
+I would say there is one major problem with push: **There's no "optional" content.**
 
-RTMP was designed by Macromedia for Flash Player in 2002.
+When a publisher creates multiple tracks, like 360p and 1080p, it needs to simultaneously encode and transmit both tracks.
+There's no way of knowing if anything downstream *actually* wants the 1080p track; it might go straight to `/dev/null` on the media server.
 
-**Pros:**
-- Universal encoder support (OBS, FFmpeg, etc.)
-- Well-understood and documented
-- Works through most firewalls (TCP)
+This doesn't matter for huge events like a concert or sports game.
+With enough viewers, we can assume that at least one viewer will want the content.
+But it can be a significant cost for long-tail content that nobody watches.
 
-**Cons:**
-- Flash is dead - browsers can't receive RTMP
-- TCP causes head-of-line blocking
-- No built-in encryption (RTMPS is optional)
-- Limited to FLV container (H.264/AAC)
-- High latency (1-5 seconds typical)
-- No adaptive bitrate at protocol level
+For example, consider a facility with hundreds of security cameras.
+We might be able to afford uploading 360p for every camera (recording to disk), but anything more than that would over-saturate the network.
+Ideally, we could only stream 1080p from individual cameras when a human wants a closer look...
 
-**Typical Use:**
-```
-OBS → RTMP → Media Server → Transcode → HLS/DASH → CDN → Viewers
-```
+### The Pull Solution
+The first thing a MoQ viewer does is subscribe to the `catalog.json` track for a broadcast.
+This lists all of the available tracks and their properties.
 
-### SRT
+If a viewer wants the 1080p track, it subscribes to it.
+The subscription makes its way upstream (combining with duplicates) until one subscription reaches the publisher.
+When no more viewers want the 1080p track, the subscription is cancelled.
 
-SRT was developed by Haivision and open-sourced in 2017.
+The publisher won't transmit a track until there's an active subscription, saving bandwidth.
+The publisher can go the extra mile and not even encode the content without a subscription, saving compute.
+This is especially useful for expensive AI models, for example only running whisper when captions are needed.
 
-**Pros:**
-- UDP-based with FEC for packet loss recovery
-- AES encryption built-in
-- Low latency (120ms-2s configurable)
-- ARQ (Automatic Repeat Request) for reliability
-- Modern, actively developed
+Note that media services can also benefit from the same behavior.
+If nobody currently wants the 1080p track, then don't transcode it.
+The "publisher" in this case is any entity that understands the media format on top of MoQ.
 
-**Cons:**
-- No native browser support
-- Single stream per connection
-- Requires port forwarding/NAT traversal
-- Firewall issues (UDP)
-- No built-in CDN/fan-out support
+## Multiple Connections
+Another issue with push-based protocols is that each connection is expensive.
+If every connection needs its own copy of the content, we quickly run out of bandwidth.
+Redundant ingest is mostly limited to large events that have bandwidth to spare (active-active).
 
-**Typical Use:**
-```
-Encoder → SRT → Media Server → Transcode → HLS/DASH → CDN → Viewers
-```
+Once again, MoQ solves this via the pull model.
+A publisher can establish multiple connections that *might* be used.
+A subscription will only be issued if the connection needs a specific track.
 
-### MoQ
+For example, a service can implement primary/secondary ingest via two connections to separate endpoints.
+All subscriptions are issued over the primary connection but if it fails, the subscriptions are moved to the secondary connection.
+The endpoints don't even have to be part of the same CDN and MoQ publisher is completely oblivious; it just knows it was told to connect to two URLs.
 
-MoQ is designed from the ground up for modern live streaming.
+Another example is P2P streaming.
+A client can establish a connection to each peer, transmitting tracks as requested.
+If one peer has the video minimized, then it can unsubscribe from the video track and save bandwidth.
+Again there's no business logic for this built into MoQ: it's automatic.
 
-**Pros:**
-- Native browser support (WebTransport)
-- End-to-end delivery (source to viewer)
-- Built-in relay/CDN support
-- QUIC handles congestion, encryption
-- Multiplexed streams (audio, video, data)
-- Sub-second latency possible
-- Prioritization and partial reliability
+But what about clients that don't support P2P?
+Each client can also establish a connection to a MoQ CDN as a fallback.
+This works because the client discovers all available broadcasts available on a connection via the built-in [announce mechanism](/feature/announce).
+If two connections can serve the same content, the subscription goes to the "best" connection (ie. P2P > CDN).
 
-**Cons:**
-- New protocol, less encoder support
-- Requires QUIC/WebTransport infrastructure
-- UDP may be blocked in some networks
+## Economies of Scale
+A subtle problem with contribution protocols is that they're not used for distribution.
 
-**Typical Use:**
-```
-Browser/Encoder → MoQ Relay → MoQ Relay (CDN) → Browser/App
-```
+This might be silly: "of course distribution and contribution are different!"
+But when you really sit down and break down the requirements, they're not that different.
+One is client-server while the other is server-client, one is 1:1 while the other is 1:N.
 
-## Key Differences
+By designing a protocol that works for both contribution and distribution, we can share implementations and optimizations.
+There are other benefits of supporting 1:N too, as mentioned in the previous section, so it seems like a no-brainer.
 
-### 1. End-to-End vs Contribution-Only
-
-RTMP and SRT are **contribution protocols** - they get content to a server, then something else distributes it.
-
-MoQ is **end-to-end** - the same protocol works from source to viewer, with relays in between.
-
-```
-Traditional:
-  Encoder → RTMP → Server → Transcode → HLS → CDN → Player
-
-MoQ:
-  Publisher → MoQ → Relay → MoQ → Viewer
-```
-
-### 2. Browser Support
-
-RTMP: Dead (Flash)
-SRT: None
-MoQ: Native via WebTransport
-
-This means MoQ can work entirely in the browser - both publishing and viewing.
-
-### 3. Multiplexing
-
-RTMP: Limited (audio + video in one stream)
-SRT: Single stream per connection
-MoQ: Multiple independent tracks via QUIC streams
-
-MoQ's multiplexing enables:
-- Independent audio/video delivery
-- Multiple quality levels
-- Additional data tracks (chat, metadata)
-- Per-track prioritization
-
-### 4. Latency Architecture
-
-RTMP: TCP reliability causes buffering
-SRT: UDP with configurable latency buffer
-MoQ: QUIC streams with prioritization and partial reliability
-
-MoQ can drop old data when congested, maintaining real-time latency.
-
-### 5. Scale Architecture
-
-RTMP/SRT: Require a separate distribution system
-MoQ: Built-in relay fan-out
-
-MoQ relays can form a mesh/CDN without transcoding or protocol translation.
-
-## When to Use What
-
-### Use RTMP when:
-- You need maximum encoder compatibility
-- You're feeding into an existing media server (Wowza, nginx-rtmp)
-- Latency of 1-5 seconds is acceptable
-- You have infrastructure already built around RTMP
-
-### Use SRT when:
-- You need low latency contribution (< 1 second)
-- You're sending over unreliable networks (Internet, cellular)
-- You need encryption for contribution
-- Firewall/NAT traversal is manageable
-
-### Use MoQ when:
-- You need browser-based publishing
-- You want end-to-end low latency
-- You're building real-time interactive applications
-- You want to leverage a single protocol source-to-viewer
-- You need CDN-like scale with low latency
-
-## Migration Path
-
-### From RTMP to MoQ
-
-1. Keep RTMP ingest for legacy encoders
-2. Use MoQ relay for distribution
-3. Add MoQ publishing for browser-based sources
-4. Gradually migrate encoders to MoQ
-
-### From SRT to MoQ
-
-1. SRT and MoQ can coexist
-2. Use MoQ for browser-based endpoints
-3. Consider MoQ for new infrastructure
-4. SRT remains good for point-to-point low latency
-
-## Example: OBS to Browser
-
-**Traditional (RTMP + HLS):**
-```
-OBS → RTMP → Media Server → Transcode → HLS → CDN → Browser
-Latency: 5-30 seconds
-```
-
-**With SRT:**
-```
-OBS → SRT → Media Server → Transcode → HLS → CDN → Browser
-Latency: 3-15 seconds (contribution faster, distribution slow)
-```
-
-**With MoQ:**
-```
-OBS → MoQ → Relay → Browser
-Latency: <1 second (or lower)
-```
-
-Note: MoQ OBS plugin is in development. See [OBS Plugin](/app/obs).
-
-## Next Steps
-
-- Compare with [distribution protocols](/concept/use-case/distribution) (HLS/DASH)
-- Compare with [conferencing protocols](/concept/use-case/conferencing) (WebRTC)
-- Read the [Protocol specification](/concept/layer/)
-- Try the [Quick Start](/setup/)
+The other way we benefit from economies of scale is by using QUIC.
+We're not implementing our own UDP-based protocol and rediscovering the rough edges of the internet all over again.
+A QUIC library with BBR will out-perform the system TCP stack and likely out-perform any custom UDP thing (ex. SRT).
