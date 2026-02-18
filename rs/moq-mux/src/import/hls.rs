@@ -333,7 +333,7 @@ impl Hls {
 			for (index, alternative) in master.alternatives.iter_mut().enumerate() {
 				if let Some(uri) = &alternative.uri {
 					let media_url = resolve_uri(&self.base_url, uri)?;
-					let track_id = format!("{}{}", &alternative.media_type, index);
+					let track_id = format!("{}{}", &alternative.media_type.to_string().to_lowercase(), index);
 					alternative.uri = Some(format!("{}.m3u8", track_id));
 					let playlist_track = self.broadcast.create_track(moq_lite::Track::new(format!("{}.m3u8", track_id)));
 
